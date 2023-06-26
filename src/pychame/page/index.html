@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Pychame Camera Panel</title>
+    <style>
+        * {
+            margin: 0;
+        }
+
+        body {
+            font-family: system-ui;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <p>This page is getting video from Chromebook's built-in camera, please allow camera access if not working</p>
+    <p>Status: <label id="status" style="color: red;">Disable</label></p>
+    <div>
+        <button>Open Camera Video</button>
+        <video style="display: none;" autoplay></video>
+    </div>
+
+    <script>
+        function setStatus(text, color) {
+            const status = document.querySelector("#status");
+            status.style.color = color == "yellow" ? "rgb(179, 179, 0)" : color;
+            status.textContent = text;
+        }
+
+        var id = null
+
+        function sendFrame(frameData) {
+            setStatus("Sending Camera Data", "green");
+
+            const formData = new FormData()
+            formData.append("frame", frameData)
+
+            fetch("https://0.0.0.0:5000/frame", {
+                method: "POST",
+                body: formData
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error("Error when data sending");
+                    }
+                })
+                .catch(error => {
+                    setStatus(error.message, "red");
+                    clearInterval(id)
+                });
+        }
+
+        const video = document.querySelector("video");
+        const btn = document.querySelector("button");
+
+        btn.addEventListener("click", () => {
+            video.style.display = video.style.display === "block" ? "none" : "block";
+            btn.textContent = video.style.display === "block" ? "Open Camera Video" : "Close Camera Video";
+        });
+
+        if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
+            setStatus("Starting Camera", "yellow");
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    setStatus("Camera ready", "green");
+                    video.srcObject = stream;
+                    video.play();
+
+                    const canvasElement = document.createElement("canvas");
+                    const ctx = canvasElement.getContext("2d");
+
+                    function captureFrame() {
+                        canvasElement.width = video.videoWidth;
+                        canvasElement.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0);
+                        canvasElement.toBlob(sendFrame, "image/png");
+                    }
+
+                    id = setInterval(captureFrame, 1000 / 20);
+                })
+                .catch(err => {
+                    setStatus(`Error: ${err}`, "red");
+                });
+        } else {
+            setStatus("Camera instance not found", "red");
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,2 @@
+include src/pychame/keys/*.pem
+include src/pychame/page/*.html
